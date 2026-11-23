@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
 private fun AAdScreen(onSpeak: (String) -> Unit) {
     var input by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
+    var accessToken by remember { mutableStateOf("") }
     var settingsVisible by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var autoSpeak by remember { mutableStateOf(false) }
@@ -82,6 +83,11 @@ private fun AAdScreen(onSpeak: (String) -> Unit) {
                 OutlinedTextField(
                     value = endpoint, onValueChange = { endpoint = it },
                     label = { Text("HTTPS backend URL") }, placeholder = { Text("https://example.com") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = accessToken, onValueChange = { accessToken = it },
+                    label = { Text("Personal backend access token") },
                     singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -143,7 +149,7 @@ private fun AAdScreen(onSpeak: (String) -> Unit) {
                     } else {
                         busy = true
                         scope.launch {
-                            val reply = withContext(Dispatchers.IO) { requestReply(endpoint, prompt) }
+                            val reply = withContext(Dispatchers.IO) { requestReply(endpoint, accessToken, prompt) }
                             messages.add(Message(reply, false))
                             if (autoSpeak) onSpeak(reply)
                             busy = false
@@ -155,7 +161,7 @@ private fun AAdScreen(onSpeak: (String) -> Unit) {
     }
 }
 
-private fun requestReply(base: String, prompt: String): String {
+private fun requestReply(base: String, token: String, prompt: String): String {
     var connection: HttpURLConnection? = null
     return try {
         val url = URL(base.trimEnd('/') + "/chat")
@@ -165,6 +171,7 @@ private fun requestReply(base: String, prompt: String): String {
             readTimeout = 30000
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Authorization", "Bearer " + token)
         }
         connection.outputStream.use { it.write(JSONObject().put("message", prompt).toString().toByteArray(Charsets.UTF_8)) }
         if (connection.responseCode !in 200..299) "Server error: HTTP ${connection.responseCode}"
