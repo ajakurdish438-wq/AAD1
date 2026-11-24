@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,11 +61,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AAdScreen(onSpeak: (String) -> Unit) {
     var input by remember { mutableStateOf("") }
-    var endpoint by remember { mutableStateOf("") }
-    var accessToken by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("aad_settings", 0) }
+    var endpoint by remember { mutableStateOf(prefs.getString("endpoint", "https://aad-ai-e96f.ajakurdish438.workers.dev").orEmpty()) }
+    var accessToken by remember { mutableStateOf(prefs.getString("token", "").orEmpty()) }
     var settingsVisible by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    var autoSpeak by remember { mutableStateOf(false) }
+    var autoSpeak by remember { mutableStateOf(prefs.getBoolean("speak", false)) }
     val messages = remember { mutableStateListOf(Message("سڵاو! من AAd AI ـم. بۆ وەڵامی AI، ناونیشانی سێرڤەر لە ڕێکخستنەکان دابنێ.", false)) }
     val scope = rememberCoroutineScope()
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -77,24 +81,37 @@ private fun AAdScreen(onSpeak: (String) -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text("AAd AI", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { settingsVisible = !settingsVisible }) { Text("⚙ Settings") }
+                TextButton(onClick = { settingsVisible = true }) { Text("⚙ Settings") }
             }
             if (settingsVisible) {
-                OutlinedTextField(
-                    value = endpoint, onValueChange = { endpoint = it },
-                    label = { Text("HTTPS backend URL") }, placeholder = { Text("https://example.com") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth()
+                AlertDialog(
+                    onDismissRequest = { settingsVisible = false },
+                    title = { Text("Settings") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = endpoint, onValueChange = { endpoint = it },
+                                label = { Text("HTTPS backend URL") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = accessToken, onValueChange = { accessToken = it },
+                                label = { Text("Backend access token") }, singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth())
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = autoSpeak, onCheckedChange = { autoSpeak = it })
+                                Text("Speak AI replies")
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(enabled = endpoint.trim().startsWith("https://"), onClick = {
+                            endpoint = endpoint.trim().trimEnd('/')
+                            prefs.edit().putString("endpoint", endpoint).putString("token", accessToken)
+                                .putBoolean("speak", autoSpeak).apply()
+                            settingsVisible = false
+                        }) { Text("Save") }
+                    },
+                    dismissButton = { TextButton(onClick = { settingsVisible = false }) { Text("Close") } }
                 )
-                OutlinedTextField(
-                    value = accessToken, onValueChange = { accessToken = it },
-                    label = { Text("Personal backend access token") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth()
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = autoSpeak, onCheckedChange = { autoSpeak = it })
-                    Text("Speak AI replies")
-                }
-                Text("API keys belong on your backend, never inside this app.", fontSize = 12.sp, color = Color.LightGray)
             }
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth().height(130.dp), contentAlignment = Alignment.Center) {
