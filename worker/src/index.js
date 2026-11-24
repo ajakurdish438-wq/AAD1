@@ -5,10 +5,11 @@ export default {
     if (request.method !== "POST" || new URL(request.url).pathname !== "/chat") {
       return new Response("Not found", { status: 404 });
     }
-    if (!env.ACCESS_TOKEN || !env.AI) {
+    const token = env.APP_TOKEN || env.ACCESS_TOKEN;
+    if (!token || !env.AI) {
       return Response.json({ error: "Backend not configured" }, { status: 503 });
     }
-    const expected = "Bearer " + env.ACCESS_TOKEN;
+    const expected = "Bearer " + token;
     if (request.headers.get("Authorization") !== expected) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
