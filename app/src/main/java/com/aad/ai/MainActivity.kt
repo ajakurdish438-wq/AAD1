@@ -105,7 +105,7 @@ private fun AAdScreen(onSpeak: (String) -> Unit) {
                     confirmButton = {
                         TextButton(enabled = endpoint.trim().startsWith("https://"), onClick = {
                             endpoint = endpoint.trim().trimEnd('/')
-                            prefs.edit().putString("endpoint", endpoint).putString("token", accessToken)
+                            prefs.edit().putString("endpoint", endpoint).putString("token", accessToken.trim())
                                 .putBoolean("speak", autoSpeak).apply()
                             settingsVisible = false
                         }) { Text("Save") }
@@ -161,7 +161,10 @@ private fun AAdScreen(onSpeak: (String) -> Unit) {
                     val prompt = input.trim()
                     input = ""
                     messages.add(Message(prompt, true))
-                    if (!endpoint.startsWith("https://")) {
+                    if (accessToken.isBlank()) {
+                        settingsVisible = true
+                        messages.add(Message("تکایە Backend access token لە Settings دابنێ.", false))
+                    } else if (!endpoint.startsWith("https://")) {
                         messages.add(Message("Set an HTTPS backend URL in Settings to enable AI replies.", false))
                     } else {
                         busy = true
@@ -188,10 +191,11 @@ private fun requestReply(base: String, token: String, prompt: String): String {
             readTimeout = 30000
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("Authorization", "Bearer " + token)
+            setRequestProperty("Authorization", "Bearer " + token.trim())
         }
         connection.outputStream.use { it.write(JSONObject().put("message", prompt).toString().toByteArray(Charsets.UTF_8)) }
-        if (connection.responseCode !in 200..299) "Server error: HTTP ${connection.responseCode}"
+        if (connection.responseCode == 401) "Token ـەکە هەڵەیە. لە Settings بیپشکنە."
+        else if (connection.responseCode !in 200..299) "Server error: HTTP ${connection.responseCode}"
         else JSONObject(connection.inputStream.bufferedReader().use { it.readText() }).optString("reply", "No reply received.")
     } catch (e: Exception) {
         "Connection failed: ${e.localizedMessage ?: "unknown error"}"
